@@ -12,6 +12,10 @@ from loguru import logger
 from surrealdb import RecordID
 
 from open_notebook.ai.connection_tester import normalize_anthropic_compatible_base_url
+from open_notebook.ai.opencode_go import (
+    headers_for_opencode_go,
+    new_opencode_session_id,
+)
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel, RecordModel
 from open_notebook.exceptions import ConfigurationError
@@ -174,8 +178,15 @@ class ModelManager:
     def __init__(self):
         pass  # No caching needed
 
-    async def get_model(self, model_id: str, **kwargs) -> Optional[ModelType]:
-        """Get a model by ID. Esperanto will cache the actual model instance."""
+    async def get_model(self, model_id: str, opencode_session_id: Optional[str] = None, **kwargs) -> Optional[ModelType]:
+        """Get a model by ID. Esperanto will cache the actual model instance.
+
+        ``opencode_session_id`` is consumed here and never forwarded to the
+        provider config: when the resolved OpenAI-compatible base URL is the
+        OpenCode Go endpoint, it becomes the opaque ``x-opencode-session``
+        header value (an ephemeral one is generated when omitted). All other
+        providers are unaffected.
+        """
         if not model_id:
             return None
 
@@ -248,6 +259,24 @@ class ModelManager:
             config["base_url"] = normalize_anthropic_compatible_base_url(
                 str(config["base_url"])
             )
+
+        # Attach the opaque OpenCode Go session header only when the resolved
+        # OpenAI-compatible base URL is the OpenCode Go endpoint. Existing
+        # default_headers are preserved; nothing else changes.
+        if model.type == "language":
+            resolved_base_url = (
+                config.get("base_url")
+                or os.environ.get("OPENAI_COMPATIBLE_BASE_URL_LLM")
+                or os.environ.get("OPENAI_COMPATIBLE_BASE_URL")
+            )
+            session_id = opencode_session_id or new_opencode_session_id()
+            opencode_headers = headers_for_opencode_go(
+                resolved_base_url,
+                session_id,
+                config.get("default_headers"),
+            )
+            if opencode_headers is not None:
+                config["default_headers"] = opencode_headers
 
         # Normalize provider name: DB stores underscores but Esperanto expects hyphens
         provider = (

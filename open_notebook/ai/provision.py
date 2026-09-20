@@ -1,3 +1,5 @@
+from typing import Optional
+
 from esperanto import LanguageModel
 from langchain_core.language_models.chat_models import BaseChatModel
 from loguru import logger
@@ -8,13 +10,20 @@ from open_notebook.utils import token_count
 
 
 async def provision_langchain_model(
-    content, model_id, default_type, **kwargs
+    content,
+    model_id,
+    default_type,
+    opencode_session_id: Optional[str] = None,
+    **kwargs,
 ) -> BaseChatModel:
     """
     Returns the best model to use based on the context size and on whether there is a specific model being requested in Config.
     If context > 105_000, returns the large_context_model
     If model_id is specified in Config, returns that model
     Otherwise, returns the default model for the given type
+
+    ``opencode_session_id`` is an explicit operation-scoped value forwarded to
+    model provisioning; it never reaches the provider as a config key.
     """
     tokens = token_count(content)
     model = None
@@ -25,13 +34,19 @@ async def provision_langchain_model(
         logger.debug(
             f"Using large context model because the content has {tokens} tokens"
         )
-        model = await model_manager.get_default_model("large_context", **kwargs)
+        model = await model_manager.get_default_model(
+            "large_context", opencode_session_id=opencode_session_id, **kwargs
+        )
     elif model_id:
         selection_reason = f"explicit model_id={model_id}"
-        model = await model_manager.get_model(model_id, **kwargs)
+        model = await model_manager.get_model(
+            model_id, opencode_session_id=opencode_session_id, **kwargs
+        )
     else:
         selection_reason = f"default for type={default_type}"
-        model = await model_manager.get_default_model(default_type, **kwargs)
+        model = await model_manager.get_default_model(
+            default_type, opencode_session_id=opencode_session_id, **kwargs
+        )
 
     logger.debug(f"Using model: {model}")
 
