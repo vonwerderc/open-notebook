@@ -21,6 +21,10 @@ from esperanto import (
 from esperanto.common_types import ChatCompletion
 from loguru import logger
 
+from open_notebook.ai.opencode_go import (
+    headers_for_opencode_go,
+    new_opencode_session_id,
+)
 from open_notebook.ai.provider_registry import PROVIDERS
 from open_notebook.utils.url_validation import prepare_pinned_http_target
 
@@ -207,6 +211,12 @@ async def _test_openai_compatible_connection(base_url: str, api_key: Optional[st
         headers = dict(target.headers)
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        # OpenCode Go requires an opaque session header on every request.
+        opencode_headers = headers_for_opencode_go(
+            base_url, new_opencode_session_id(), headers
+        )
+        if opencode_headers is not None:
+            headers = opencode_headers
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             # Try /models endpoint (standard OpenAI-compatible)
@@ -490,7 +500,9 @@ async def test_individual_model(model) -> Tuple[bool, str]:
 
     try:
         manager = ModelManager()
-        esp_model = await manager.get_model(model.id)
+        esp_model = await manager.get_model(
+            model.id, opencode_session_id=new_opencode_session_id()
+        )
 
         if esp_model is None:
             return False, "Could not create model instance"
