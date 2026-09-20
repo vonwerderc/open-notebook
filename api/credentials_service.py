@@ -22,6 +22,10 @@ from open_notebook.ai.model_discovery import (
     classify_model_type,
     fetch_anthropic_model_ids,
 )
+from open_notebook.ai.opencode_go import (
+    headers_for_opencode_go,
+    new_opencode_session_id,
+)
 from open_notebook.ai.provider_registry import PROVIDERS
 from open_notebook.domain.credential import Credential
 from open_notebook.utils.encryption import get_secret_from_env
@@ -486,6 +490,12 @@ async def discover_with_config(provider: str, config: dict) -> List[dict]:
             headers = dict(target.headers)
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
+            # OpenCode Go requires an opaque session header on discovery too.
+            opencode_headers = headers_for_opencode_go(
+                base_url, new_opencode_session_id(), headers
+            )
+            if opencode_headers is not None:
+                headers = opencode_headers
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     target.url,
