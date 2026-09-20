@@ -45,6 +45,7 @@ def _chat_result():
 
 
 def _captured_config(mock_graph):
+    assert mock_graph.invoke.call_args is not None
     _, kwargs = mock_graph.invoke.call_args
     return kwargs["config"]["configurable"]
 
@@ -197,9 +198,10 @@ class TestGraphNodesPassValueToProvisioning:
                     "opencode_session_id": NB_VALUE,
                 }
             }
-            call_model_with_messages(state, config)
+            call_model_with_messages(state, config)  # type: ignore[arg-type]
 
         assert mock_provision.await_count == 1
+        assert mock_provision.await_args is not None
         assert (
             mock_provision.await_args.kwargs["opencode_session_id"] == NB_VALUE
         )
@@ -239,9 +241,10 @@ class TestGraphNodesPassValueToProvisioning:
                     "opencode_session_id": SRC_VALUE,
                 }
             }
-            _call_model_with_source_context_inner(state, config)
+            _call_model_with_source_context_inner(state, config)  # type: ignore[arg-type]
 
         assert mock_provision.await_count == 1
+        assert mock_provision.await_args is not None
         assert (
             mock_provision.await_args.kwargs["opencode_session_id"] == SRC_VALUE
         )

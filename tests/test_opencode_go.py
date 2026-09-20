@@ -97,6 +97,7 @@ class TestHeaderMerging:
         headers = headers_for_opencode_go(
             "https://opencode.ai/zen/go/v1", "ses_abc", existing
         )
+        assert headers is not None
         assert headers[OPENCODE_SESSION_HEADER] == "ses_abc"
         assert headers["Authorization"] == "Bearer k"
         assert headers["X-Custom"] == "1"
@@ -171,10 +172,10 @@ def _patch_factory(monkeypatch):
         def provider(self):
             return "openai-compatible"
 
-        def chat_complete(self, messages, **kwargs):
+        def chat_complete(self, messages, **kwargs):  # type: ignore[override]
             raise NotImplementedError
 
-        async def achat_complete(self, messages, **kwargs):
+        async def achat_complete(self, messages, **kwargs):  # type: ignore[override]
             raise NotImplementedError
 
         def _get_models(self):

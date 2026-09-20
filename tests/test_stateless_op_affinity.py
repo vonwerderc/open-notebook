@@ -172,12 +172,15 @@ class TestGraphNodesUseConfiguredValue:
             ask_graph_module, "vector_search", new_callable=AsyncMock, return_value=[{"id": "1", "content": "c"}]
         ):
             await ask_graph_module.call_model_with_messages(
-                {"question": "q"}, config
+                {"question": "q"}, config  # type: ignore[typeddict-item,arg-type]
             )
             await ask_graph_module.provide_answer(
-                {"question": "q", "term": "t", "instructions": "i"}, config
+                {"question": "q", "term": "t", "instructions": "i"},  # type: ignore[typeddict-item]
+                config,  # type: ignore[arg-type]
             )
-            await ask_graph_module.write_final_answer({"question": "q"}, config)
+            await ask_graph_module.write_final_answer(
+                {"question": "q"}, config  # type: ignore[typeddict-item,arg-type]
+            )
 
         assert captured == ["ses_fixed", "ses_fixed", "ses_fixed"]
 
@@ -207,7 +210,9 @@ class TestGraphNodesUseConfiguredValue:
             "configurable": {"model_id": "model:1", "opencode_session_id": "ses_op"}
         }
         with patch.object(tx_module, "provision_langchain_model", fake_provision):
-            await tx_module.run_transformation(state, config)
+            await tx_module.run_transformation(
+                state, config  # type: ignore[arg-type]
+            )
 
         assert captured == ["ses_op"]
 
@@ -230,7 +235,8 @@ class TestGraphNodesUseConfiguredValue:
         config = {"configurable": {"opencode_session_id": "ses_title"}}
         with patch.object(prompt_module, "provision_langchain_model", fake_provision):
             await prompt_module.call_model(
-                {"input_text": "text", "prompt": "make a title"}, config
+                {"input_text": "text", "prompt": "make a title"},
+                config,  # type: ignore[arg-type]
             )
 
         assert captured == ["ses_title"]
