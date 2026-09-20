@@ -128,25 +128,43 @@ class TestDiscoveryOpenAICompatible:
 class TestIndividualModelTest:
     @pytest.mark.asyncio
     async def test_language_model_test_passes_operation_id_to_provisioning(self):
+        from unittest.mock import patch
+
+        from esperanto import LanguageModel
+
         captured = {}
 
-        class FakeEspModel:
+        class FakeLanguageModel(LanguageModel):
+            @property
+            def provider(self):
+                return "openai-compatible"
+
             async def achat_complete(self, messages):
                 captured["called"] = True
-                return SimpleNamespace(content="hello", __class__=type("X", (), {}))
+                return SimpleNamespace(content="hello")
+
+            def chat_complete(self, messages, **kwargs):
+                raise NotImplementedError
+
+            def _get_models(self):
+                return []
+
+            def _get_default_model(self):
+                return ""
+
+            def to_langchain(self):
+                raise NotImplementedError
 
         async def fake_get_model(self, model_id, opencode_session_id=None, **kwargs):
             captured["opencode_session_id"] = opencode_session_id
-            return FakeEspModel()
+            return FakeLanguageModel()
 
         import open_notebook.ai.models as models_module
 
         model = SimpleNamespace(
             id="model:1", type="language", provider="openai_compatible"
         )
-        with __import__("unittest.mock", fromlist=["patch"]).patch.object(
-            models_module.ModelManager, "get_model", fake_get_model
-        ):
+        with patch.object(models_module.ModelManager, "get_model", fake_get_model):
             ok, msg = await connection_tester.test_individual_model(model)
 
         assert ok is True
