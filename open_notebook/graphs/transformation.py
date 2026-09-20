@@ -48,6 +48,9 @@ async def run_transformation(state: dict, config: RunnableConfig) -> dict:
             str(payload),
             config.get("configurable", {}).get("model_id"),
             "transformation",
+            opencode_session_id=config.get("configurable", {}).get(
+                "opencode_session_id"
+            ),
             max_tokens=8192,
         )
 

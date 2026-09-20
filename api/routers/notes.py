@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from loguru import logger
 
 from api.models import NoteCreate, NoteResponse, NoteUpdate
+from open_notebook.ai.opencode_go import new_opencode_session_id
 from open_notebook.domain.notebook import Note
 from open_notebook.exceptions import (
     InvalidInputError,
@@ -68,7 +69,13 @@ async def create_note(note_data: NoteCreate):
                 {
                     "input_text": note_data.content,
                     "prompt": prompt,
-                }
+                },
+                config=dict(
+                    configurable={
+                        # One ephemeral value per note-creation request.
+                        "opencode_session_id": new_opencode_session_id(),
+                    }
+                ),
             )
             title = result.get("output", "Untitled Note")
 

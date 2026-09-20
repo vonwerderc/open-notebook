@@ -11,6 +11,7 @@ from loguru import logger
 from typing_extensions import Annotated, TypedDict
 
 from open_notebook.ai.models import Model, ModelManager
+from open_notebook.ai.opencode_go import new_opencode_session_id
 from open_notebook.domain.content_settings import ContentSettings
 from open_notebook.domain.notebook import Asset, Source
 from open_notebook.domain.transformation import Transformation
@@ -257,11 +258,17 @@ async def transform_content(state: TransformationState) -> Optional[dict]:
     transformation: Transformation = state["transformation"]
 
     logger.debug(f"Applying transformation {transformation.name}")
+    # One ephemeral value per source-transformation invocation. Never logged.
     # LangGraph accepts a partial state dict at runtime, but its typed
     # overloads require the full state type (langgraph typing limitation).
     result = await transform_graph.ainvoke(  # type: ignore[call-overload]
         dict(input_text=content, transformation=transformation),
-        config=RunnableConfig(configurable={"model_id": transformation.model_id}),
+        config=RunnableConfig(
+            configurable={
+                "model_id": transformation.model_id,
+                "opencode_session_id": new_opencode_session_id(),
+            }
+        ),
     )
     await source.add_insight(transformation.title, result["output"])
     return {

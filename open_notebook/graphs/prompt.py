@@ -31,6 +31,9 @@ async def call_model(state: dict, config: RunnableConfig) -> dict:
         str(payload),
         config.get("configurable", {}).get("model_id"),
         "transformation",
+        opencode_session_id=config.get("configurable", {}).get(
+            "opencode_session_id"
+        ),
         max_tokens=5000,
     )
 
