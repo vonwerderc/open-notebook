@@ -13,6 +13,7 @@ from api.models import (
     TransformationUpdate,
 )
 from open_notebook.ai.models import Model
+from open_notebook.ai.opencode_go import new_opencode_session_id
 from open_notebook.domain.transformation import DefaultPrompts, Transformation
 from open_notebook.exceptions import InvalidInputError, OpenNotebookError
 from open_notebook.graphs.transformation import graph as transformation_graph
@@ -116,7 +117,13 @@ async def execute_transformation(execute_request: TransformationExecuteRequest):
                 input_text=execute_request.input_text,
                 transformation=transformation,
             ),
-            config=dict(configurable={"model_id": model_id}),
+            config=dict(
+                configurable={
+                    "model_id": model_id,
+                    # One ephemeral value per execute request. Never logged.
+                    "opencode_session_id": new_opencode_session_id(),
+                }
+            ),
         )
 
         return TransformationExecuteResponse(

@@ -16,6 +16,7 @@ from api.routers._chat_shared import (
     get_source_or_404,
     get_verified_source_session,
 )
+from open_notebook.ai.opencode_go import persistent_opencode_session_id
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import ChatSession
 from open_notebook.exceptions import (
@@ -367,7 +368,15 @@ async def stream_source_chat_response(
             lambda: source_chat_graph.invoke(
                 input=state_values,  # type: ignore[arg-type]
                 config=RunnableConfig(
-                    configurable={"thread_id": session_id, "model_id": model_override}
+                    configurable={
+                        "thread_id": session_id,
+                        "model_id": model_override,
+                        # Stable, opaque per-session value; independent from
+                        # notebook chats and never logged.
+                        "opencode_session_id": persistent_opencode_session_id(
+                            session_id
+                        ),
+                    }
                 ),
             )
         )

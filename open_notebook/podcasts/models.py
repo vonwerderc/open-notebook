@@ -1,20 +1,29 @@
+import os
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
 
 from loguru import logger
 from pydantic import ConfigDict, Field, field_validator
 from surrealdb import RecordID
 
+from open_notebook.ai.opencode_go import headers_for_opencode_go
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
 
 
 async def _resolve_model_config(
-    model_id: str, max_tokens: Optional[int] = None
+    model_id: str,
+    max_tokens: Optional[int] = None,
+    opencode_session_id: Optional[str] = None,
 ) -> Tuple[str, str, dict]:
     """Load Model record, resolve credential -> (provider, model_name, config_dict).
 
     Used by resolve_outline_config, resolve_transcript_config, resolve_tts_config,
     and per-speaker TTS overrides. Optionally passes through a max_tokens override.
+
+    When ``opencode_session_id`` is supplied and the resolved model is a language
+    model pointing at the OpenCode Go endpoint, the opaque ``x-opencode-session``
+    header is injected into the returned config so podcast-creator forwards it.
+    TTS and other providers are untouched.
     """
     from open_notebook.ai.models import Model
 
@@ -30,6 +39,17 @@ async def _resolve_model_config(
         await provision_provider_keys(model.provider)
     if max_tokens is not None:
         config = {**config, "max_tokens": max_tokens}
+    if opencode_session_id and model.type == "language":
+        resolved_base_url = (
+            config.get("base_url")
+            or os.environ.get("OPENAI_COMPATIBLE_BASE_URL_LLM")
+            or os.environ.get("OPENAI_COMPATIBLE_BASE_URL")
+        )
+        opencode_headers = headers_for_opencode_go(
+            resolved_base_url, opencode_session_id, config.get("default_headers")
+        )
+        if opencode_headers is not None:
+            config = {**config, "default_headers": opencode_headers}
     return (model.provider, model.name, config)
 
 
@@ -95,16 +115,24 @@ class EpisodeProfile(ObjectModel):
             data["transcript_llm"] = ensure_record_id(data["transcript_llm"])
         return data
 
-    async def resolve_outline_config(self) -> Tuple[str, str, dict]:
+    async def resolve_outline_config(
+        self, opencode_session_id: Optional[str] = None
+    ) -> Tuple[str, str, dict]:
         """Resolve outline model -> (provider, model_name, config_dict)"""
         if not self.outline_llm:
             raise ValueError(
                 f"Episode profile '{self.name}' has no outline model configured. "
                 "Please update the profile to select an outline model."
             )
-        return await _resolve_model_config(self.outline_llm, max_tokens=self.max_tokens)
+        return await _resolve_model_config(
+            self.outline_llm,
+            max_tokens=self.max_tokens,
+            opencode_session_id=opencode_session_id,
+        )
 
-    async def resolve_transcript_config(self) -> Tuple[str, str, dict]:
+    async def resolve_transcript_config(
+        self, opencode_session_id: Optional[str] = None
+    ) -> Tuple[str, str, dict]:
         """Resolve transcript model -> (provider, model_name, config_dict)"""
         if not self.transcript_llm:
             raise ValueError(
@@ -112,7 +140,9 @@ class EpisodeProfile(ObjectModel):
                 "Please update the profile to select a transcript model."
             )
         return await _resolve_model_config(
-            self.transcript_llm, max_tokens=self.max_tokens
+            self.transcript_llm,
+            max_tokens=self.max_tokens,
+            opencode_session_id=opencode_session_id,
         )
 
     @classmethod

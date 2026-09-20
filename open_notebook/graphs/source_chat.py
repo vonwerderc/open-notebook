@@ -91,6 +91,10 @@ def _call_model_with_source_context_inner(
     # Extract source and insights from context
     source = None
     insights = []
+    # Operation-scoped OpenCode session value configured by the router.
+    # Passed explicitly (not via contextvars) because provisioning runs on a
+    # worker thread with a new event loop.
+    opencode_session_id = config.get("configurable", {}).get("opencode_session_id")
     context_indicators: dict[str, list[str | None]] = {
         "sources": [],
         "insights": [],
@@ -141,6 +145,7 @@ def _call_model_with_source_context_inner(
                     config.get("configurable", {}).get("model_id")
                     or state.get("model_override"),
                     "chat",
+                    opencode_session_id=opencode_session_id,
                     max_tokens=8192,
                 )
             )
@@ -165,6 +170,7 @@ def _call_model_with_source_context_inner(
                 config.get("configurable", {}).get("model_id")
                 or state.get("model_override"),
                 "chat",
+                opencode_session_id=opencode_session_id,
                 max_tokens=8192,
             )
         )

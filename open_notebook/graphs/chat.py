@@ -34,6 +34,12 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
         model_id = config.get("configurable", {}).get("model_id") or state.get(
             "model_override"
         )
+        # Operation-scoped OpenCode session value configured by the router.
+        # Passed explicitly (not via contextvars) because provisioning runs on
+        # a worker thread with a new event loop.
+        opencode_session_id = config.get("configurable", {}).get(
+            "opencode_session_id"
+        )
 
         # Handle async model provisioning from sync context
         def run_in_new_loop():
@@ -43,7 +49,11 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
                 asyncio.set_event_loop(new_loop)
                 return new_loop.run_until_complete(
                     provision_langchain_model(
-                        str(payload), model_id, "chat", max_tokens=8192
+                        str(payload),
+                        model_id,
+                        "chat",
+                        opencode_session_id=opencode_session_id,
+                        max_tokens=8192,
                     )
                 )
             finally:
@@ -66,6 +76,7 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
                     str(payload),
                     model_id,
                     "chat",
+                    opencode_session_id=opencode_session_id,
                     max_tokens=8192,
                 )
             )

@@ -15,6 +15,10 @@ from loguru import logger
 
 from open_notebook.ai.connection_tester import normalize_anthropic_compatible_base_url
 from open_notebook.ai.models import Model
+from open_notebook.ai.opencode_go import (
+    headers_for_opencode_go,
+    new_opencode_session_id,
+)
 from open_notebook.ai.provider_registry import PROVIDERS
 from open_notebook.database.repository import repo_query
 from open_notebook.domain.credential import Credential
@@ -693,6 +697,12 @@ async def discover_openai_compatible_models() -> List[DiscoveredModel]:
         headers = dict(target.headers)
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        # OpenCode Go requires an opaque session header on discovery too.
+        opencode_headers = headers_for_opencode_go(
+            base_url, new_opencode_session_id(), headers
+        )
+        if opencode_headers is not None:
+            headers = opencode_headers
 
         async with httpx.AsyncClient() as client:
             response = await client.get(

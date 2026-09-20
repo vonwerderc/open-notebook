@@ -7,6 +7,7 @@ from loguru import logger
 
 from api.models import AskRequest, AskResponse, SearchRequest, SearchResponse
 from open_notebook.ai.models import Model, model_manager
+from open_notebook.ai.opencode_go import new_opencode_session_id
 from open_notebook.domain.notebook import text_search, vector_search
 from open_notebook.exceptions import (
     DatabaseOperationError,
@@ -72,7 +73,9 @@ async def stream_ask_response(
     """Stream the ask response as Server-Sent Events."""
     try:
         final_answer = None
-
+        # One ephemeral operation value for the whole Ask operation: every
+        # node (strategy/answer/final answer) reuses it. Never logged.
+        operation_session_id = new_opencode_session_id()
         # LangGraph accepts a partial state dict at runtime, but its typed
         # overloads require the full state type (langgraph typing limitation).
         async for chunk in ask_graph.astream(  # type: ignore[call-overload]
@@ -82,6 +85,7 @@ async def stream_ask_response(
                     strategy_model=strategy_model.id,
                     answer_model=answer_model.id,
                     final_answer_model=final_answer_model.id,
+                    opencode_session_id=operation_session_id,
                 )
             ),
             stream_mode="updates",
@@ -208,6 +212,8 @@ async def ask_knowledge_base_simple(ask_request: AskRequest):
 
         # Run the ask graph and get final result
         final_answer = None
+        # One ephemeral operation value shared by all Ask subcalls. Never logged.
+        operation_session_id = new_opencode_session_id()
         # LangGraph accepts a partial state dict at runtime, but its typed
         # overloads require the full state type (langgraph typing limitation).
         async for chunk in ask_graph.astream(  # type: ignore[call-overload]
@@ -217,6 +223,7 @@ async def ask_knowledge_base_simple(ask_request: AskRequest):
                     strategy_model=strategy_model.id,
                     answer_model=answer_model.id,
                     final_answer_model=final_answer_model.id,
+                    opencode_session_id=operation_session_id,
                 )
             ),
             stream_mode="updates",
