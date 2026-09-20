@@ -6,6 +6,10 @@ from typing import Optional
 from loguru import logger
 from surreal_commands import CommandInput, CommandOutput, command
 
+from open_notebook.ai.opencode_go import (
+    new_opencode_session_id,
+    persistent_opencode_session_id,
+)
 from open_notebook.config import PODCASTS_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.podcasts.audio_paths import to_relative_audio_path
@@ -125,12 +129,27 @@ async def generate_podcast_command(
                 "Please update the profile to select a voice model."
             )
 
-        # 3. Resolve model configs with credentials
+        # 3. Resolve model configs with credentials.
+        # One operation-scoped OpenCode session value per job: derived from the
+        # command ID when present, ephemeral otherwise; every outline/transcript
+        # config resolution for this job reuses it so all LLM calls share one
+        # session. TTS configs never receive it.
+        job_session_id = (
+            persistent_opencode_session_id(
+                str(input_data.execution_context.command_id)
+            )
+            if input_data.execution_context
+            else new_opencode_session_id()
+        )
         outline_provider, outline_model_name, outline_config = (
-            await episode_profile.resolve_outline_config()
+            await episode_profile.resolve_outline_config(
+                opencode_session_id=job_session_id
+            )
         )
         transcript_provider, transcript_model_name, transcript_config = (
-            await episode_profile.resolve_transcript_config()
+            await episode_profile.resolve_transcript_config(
+                opencode_session_id=job_session_id
+            )
         )
         tts_provider, tts_model_name, tts_config = (
             await speaker_profile.resolve_tts_config()
@@ -195,6 +214,7 @@ async def generate_podcast_command(
                     prov, model, conf = await _resolve_model_config(
                         str(ep_dict["outline_llm"]),
                         max_tokens=ep_dict.get("max_tokens"),
+                        opencode_session_id=job_session_id,
                     )
                     ep_dict["outline_provider"] = prov
                     ep_dict["outline_model"] = model
@@ -203,6 +223,7 @@ async def generate_podcast_command(
                     prov, model, conf = await _resolve_model_config(
                         str(ep_dict["transcript_llm"]),
                         max_tokens=ep_dict.get("max_tokens"),
+                        opencode_session_id=job_session_id,
                     )
                     ep_dict["transcript_provider"] = prov
                     ep_dict["transcript_model"] = model
