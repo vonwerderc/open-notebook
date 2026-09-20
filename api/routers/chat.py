@@ -13,6 +13,7 @@ from api.routers._chat_shared import (
     extract_chat_messages,
     get_session_or_404,
 )
+from open_notebook.ai.opencode_go import persistent_opencode_session_id
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import ChatSession, Notebook
 from open_notebook.exceptions import (
@@ -359,6 +360,11 @@ async def execute_chat(request: ExecuteChatRequest):
                     configurable={
                         "thread_id": full_session_id,
                         "model_id": model_override,
+                        # Stable, opaque per-session value; derives from the
+                        # existing thread_id and is never logged.
+                        "opencode_session_id": persistent_opencode_session_id(
+                            full_session_id
+                        ),
                     }
                 ),
             )
